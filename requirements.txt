@@ -1,0 +1,9 @@
+streamlit
+sqlalchemy
+pymysql
+mysql
+pandas
+numpy
+groq
+matplotlib
+python-dotenv

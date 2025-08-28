@@ -1,3 +1,2 @@
-# Installe les dépendances pour compiler le connecteur MySQL
 default-libmysqlclient-dev
 pkg-config

@@ -9,9 +9,6 @@ venv/
 __pycache__/
 *.pyc
 
-# Ignorer les caches de Streamlit
-.streamlit/
-
 # Ignorer les fichiers de log ou de données générés localement
 *.log
 *.db

@@ -1,0 +1,29 @@
+# Ignorer le dossier de l'environnement virtuel Python
+venv/
+
+# Ignorer le fichier de variables d'environnement
+.env
+
+# Voici quelques autres éléments courants à ignorer pour les projets Python
+# Ignorer les caches de Python
+__pycache__/
+*.pyc
+
+# Ignorer les caches de Streamlit
+.streamlit/
+
+# Ignorer les fichiers de log ou de données générés localement
+*.log
+*.db
+
+# les fichier python pas important
+connection.py
+llm_setup.py
+test_db_connection.py
+test_llm_setup.py
+bon_code.py
+
+# Images de schéma
+schema_relationnel.jpg
+schema_relationnel1.jpg
+mon_logo.jpg

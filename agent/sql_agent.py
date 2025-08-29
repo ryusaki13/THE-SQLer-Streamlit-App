@@ -160,7 +160,7 @@ def get_db_connection():
             host=secrets["DB_HOST"],
             user=secrets["DB_USER"],
             password=secrets["DB_PASSWORD"],
-            port=secrets["DB_PORT"],
+            port=int(secrets["DB_PORT"]),
             database=secrets["DB_DATABASE"]
         )
         if connection.is_connected():

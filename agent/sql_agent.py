@@ -140,25 +140,35 @@ Règles strictes pour la génération de requêtes :
 """
 
 # --- Configuration de la base de données ---
+import os
+import mysql.connector
+from mysql.connector import Error
+from dotenv import load_dotenv
+import streamlit as st
+
+load_dotenv()
+
+@st.cache_resource
 def get_db_connection():
-    """Crée et renvoie un objet de connexion à la base de données."""
-    db_name = os.getenv("DB_DATABASE")
-    if not db_name:
-        print("Erreur: La variable d'environnement DB_DATABASE n'est pas définie.")
-        return None
+    if "STREAMLIT_SERVER_PORT" in os.environ:
+        secrets = st.secrets
+    else:
+        secrets = os.environ
 
     try:
         connection = mysql.connector.connect(
-            host=os.getenv("DB_HOST"),
-            user=os.getenv("DB_USER"),
-            password=os.getenv("DB_PASSWORD"),
-            database=db_name
+            host=secrets["DB_HOST"],
+            user=secrets["DB_USER"],
+            password=secrets["DB_PASSWORD"],
+            port=secrets["DB_PORT"],
+            database=secrets["DB_DATABASE"]
         )
         if connection.is_connected():
             return connection
     except Error as e:
-        print(f"Erreur lors de la connexion à MySQL: {e}")
+        st.error(f"Erreur lors de la connexion à MySQL: {e}")
         return None
+    
 
 # --- Configuration de l'agent LLM (Groq) ---
 def setup_groq_client():

@@ -179,7 +179,7 @@ elif st.session_state.page == "info_base":
     Voici le schéma relationnel de la base de données **Classicmodels**. 
     Il permet de visualiser les tables et les relations entre elles.
     """)
-    st.image("C:\\Master USPN\\Cours M1 Big Data\\Projets Portfolio\\Mon agent SQL\\assets/schema_relationnel.jpg",
+    st.image("assets/schema_relationnel.jpg",
              caption="Schéma relationnel Classicmodels", use_container_width=True)
     
     st.markdown("""

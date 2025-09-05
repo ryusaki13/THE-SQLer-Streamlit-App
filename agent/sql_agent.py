@@ -3,6 +3,7 @@
 # Importations
 import os
 import mysql.connector
+import re
 from dotenv import load_dotenv
 from mysql.connector import Error
 from groq import Groq
@@ -53,7 +54,7 @@ table_documentation = {
         "Mesure l'efficacité de vente (% du stock vendu). **Utiliser cette table en priorité pour les questions 'taux d'écoulement'.**",
     'marge_produit':
         "Performance par gamme. Colonnes: productLine, revenu_brut_total. "
-        "Analyse de rentabilité par ligne de produits.",
+        "Analyse de rentabilité par ligne de produits. **La table contient les colonnes `productLine`, `productName`, `revenu_brut`. Le `revenu_brut` est la marge par produit.**",
     'rotation_stock':
         "Rotation des produits. Colonnes: productCode, rotation. "
         "Indicateur de vitesse de vente (renouvellement du stock). **Utiliser cette table UNIQUEMENT pour la question 'taux de rotation'.**",
@@ -80,9 +81,9 @@ Règles strictes pour la génération de requêtes :
 3.  La colonne 'priceEach' (prix unitaire de vente) est dans la table 'orderdetails'. Ne jamais la chercher dans 'products'.
 4.  La colonne 'buyPrice' (prix d'achat) est dans la table 'products'.
 5.  Pour lier 'orders' et 'payments', utilisez le 'customerNumber'.
-6.  **RÈGLE CRITIQUE:** Pour trouver les employés responsables des clients (ex: 'nombre de clients par employé'), vous DEVEZ OBLIGATOIREMENT joindre la table `employees` (`e`) et la table `customers` (`c`) sur `e.employeeNumber = c.salesRepEmployeeNumber`. C'est la seule jointure correcte. La colonne `salesRepEmployeeNumber` est dans la table `customers`. Ne jamais l'utiliser avec l'alias `e`.
+6.  Pour trouver les employés responsables des clients (ex: 'nombre de clients par employé'), vous DEVEZ OBLIGATOIREMENT joindre la table `employees` (`e`) et la table `customers` (`c`) sur `e.employeeNumber = c.salesRepEmployeeNumber`. C'est la seule jointure correcte. La colonne `salesRepEmployeeNumber` est dans la table `customers`. Ne jamais l'utiliser avec l'alias `e`.
 7.  Pour la 'durée moyenne de paiement', calculez `AVG(paymentDate) - AVG(orderDate)`.
-8.  **RÈGLE CRITIQUE:** Lorsque vous affichez des informations sur les employés, les clients ou les produits, vous DEVEZ OBLIGATOIREMENT utiliser leur nom (`firstName`, `lastName` pour les employés, `customerName` pour les clients, `productName` pour les produits) au lieu de leur identifiant numérique (`employeeNumber`, `customerNumber`, `productCode`). Les identifiants ne doivent être utilisés que si cela est explicitement demandé par l'utilisateur.
+8.  Lorsque vous affichez des informations sur les employés, les clients ou les produits, vous DEVEZ OBLIGATOIREMENT utiliser leur nom (`firstName`, `lastName` pour les employés, `customerName` pour les clients, `productName` pour les produits) au lieu de leur identifiant numérique (`employeeNumber`, `customerNumber`, `productCode`). Les identifiants ne doivent être utilisés que si cela est explicitement demandé par l'utilisateur.
 9.  L'agent est bilingue. Utilisez ces correspondances :
     - `turnover`, `revenue`, `sales` -> Calculer `SUM(od.quantityOrdered * od.priceEach)`.
     - `customers`, `clients` -> `customers` (table)
@@ -102,73 +103,80 @@ Règles strictes pour la génération de requêtes :
 13. **SI** la question demande la 'marge en valeur' ou 'marge brute', **ALORS** vous DEVEZ utiliser uniquement la colonne `(SUM(od.quantityOrdered * od.priceEach) - SUM(od.quantityOrdered * p.buyPrice)) AS marge_brute`.
 14. **SI** la question demande le 'pourcentage de marge' ou 'taux de marge', **ALORS** vous DEVEZ utiliser uniquement la colonne `(SUM(od.quantityOrdered * od.priceEach) - SUM(od.quantityOrdered * p.buyPrice)) / SUM(od.quantityOrdered * od.priceEach) AS marge_brute_pourcentage`.
 15. Ne jamais inclure les deux calculs de marge dans une seule requête, sauf si cela est explicitement demandé par l'utilisateur.
-16. **RÈGLE CRITIQUE:** **SI** la question demande le 'taux d'écoulement du stock', **ALORS** vous devez OBLIGATOIREMENT utiliser la table `ecoulement_stock` et sélectionner les colonnes `productName` et `taux_ecoulement_stock`. AUCUNE jointure avec la table `products` n'est nécessaire.
-17. **RÈGLE CRITIQUE:** **SI** la question demande le 'taux de rotation du stock', **ALORS** vous devez OBLIGATOIREMENT utiliser la table `rotation_stock` et la colonne `rotation`.
-18. **RÈGLE CRITIQUE (CORRECTION):** **SI** la question demande la 'valeur du stock' au prix d'achat, **ALORS** vous devez OBLIGATOIREMENT utiliser la table `value_stock_quantity` et effectuer un `GROUP BY productLine` en utilisant `SUM(vs.valeur_stock)`. AUCUNE jointure avec d'autres tables n'est nécessaire.
-19. **RÈGLE CRITIQUE:** **SI** la question demande le 'taux de recouvrement', **ALORS** vous devez OBLIGATOIREMENT utiliser la table `recouvrement` et la joindre à la table `customers` sur `customerNumber` pour obtenir le nom du client. Vous devez aussi trier le résultat en utilisant la colonne `Taux_recouvrement`.
+16. **SI** la question demande le 'taux d'écoulement du stock', **ALORS** vous devez OBLIGATOIREMENT utiliser la table `ecoulement_stock` et sélectionner les colonnes `productName` et `taux_ecoulement_stock`. AUCUNE jointure avec la table `products` n'est nécessaire.
+17. **SI** la question demande le 'taux de rotation du stock', **ALORS** vous devez OBLIGATOIREMENT utiliser la table `rotation_stock` et la colonne `rotation`.
+18. **SI** la question demande la 'valeur du stock au prix d'achat par ligne de produit', **ALORS** vous devez OBLIGATOIREMENT utiliser la table `value_stock_quantity` et effectuer un `GROUP BY productLine` en utilisant `SUM(vs.valeur_stock)`. AUCUNE jointure avec d'autres tables n'est nécessaire.
+19. **SI** la question demande le 'taux de recouvrement', **ALORS** vous devez OBLIGATOIREMENT utiliser la table `recouvrement` et la joindre à la table `customers` sur `customerNumber` pour obtenir le nom du client. Vous devez aussi trier le résultat en utilisant la colonne `Taux_recouvrement`.
 20. Pour les autres métriques pré-calculées, utilisez directement les tables correspondantes (`marge_produit`, `value_stock_quantity`).
-21. **RÈGLE CRITIQUE:** **SI** la question demande la 'valeur du stock au prix de vente moyen' ou des termes similaires, **ALORS** vous DEVEZ OBLIGATOIREMENT :
+21. **SI** la question demande la 'valeur du stock au prix de vente moyen' ou des termes similaires, **ALORS** vous DEVEZ OBLIGATOIREMENT :
     - Utiliser une sous-requête pour calculer `AVG(od.priceEach)` pour chaque `productCode` de la table `orderdetails`.
     - Joindre cette sous-requête avec la table `products` sur `productCode`.
     - Calculer la somme `SUM(t1.average_price * p.quantityInStock)` et regrouper par `p.productLine`.
     - NE PAS UTILISER la table `value_stock_quantity` pour cette question.
-22. **RÈGLE CRITIQUE:** **SI** la question demande la 'valeur du stock au prix de vente maximal' ou des termes similaires, **ALORS** vous DEVEZ OBLIGATOIREMENT :
+22. **SI** la question demande la 'valeur du stock au prix de vente maximal' ou des termes similaires, **ALORS** vous DEVEZ OBLIGATOIREMENT :
     - Utiliser une sous-requête pour calculer `MAX(od.priceEach)` pour chaque `productCode` de la table `orderdetails`.
     - Joindre cette sous-requête avec la table `products` sur `productCode`.
     - Calculer la somme `SUM(t1.max_price * p.quantityInStock)` et regrouper par `p.productLine`.
     - NE PAS UTILISER la table `value_stock_quantity` pour cette question.
-23. **RÈGLE CRITIQUE (NOUVELLE):** **SI** la question demande la 'valeur du stock au prix de vente minimal' ou des termes similaires, **ALORS** vous DEVEZ OBLIGATOIREMENT :
+23. **SI** la question demande la 'valeur du stock au prix de vente minimal' ou des termes similaires, **ALORS** vous DEVEZ OBLIGATOIREMENT :
     - Utiliser une sous-requête pour calculer `MIN(od.priceEach)` pour chaque `productCode` de la table `orderdetails`.
     - Joindre cette sous-requête avec la table `products` sur `productCode`.
     - Calculer la somme `SUM(t1.min_price * p.quantityInStock)` et regrouper par `p.productLine`.
     - NE PAS UTILISER la table `value_stock_quantity` pour cette question.
-24. **RÈGLE CRITIQUE (NOUVELLE):** **SI** la question demande des informations sur les commandes (`orders`), les clients (`customers`) ou le chiffre d'affaires (`turnover`) par bureau (`office`), **ALORS** vous DEVEZ OBLIGATOIREMENT utiliser cette chaîne de jointures : `offices` (`o`) -> `employees` (`e`) -> `customers` (`c`) -> `orders` (`ord`). La jointure se fait sur `o.officeCode = e.officeCode`, `e.employeeNumber = c.salesRepEmployeeNumber`, et `c.customerNumber = ord.customerNumber`.
-25. **RÈGLE CRITIQUE (AJOUTÉE):** Si la question demande le 'nombre total de commandes par bureau', vous DEVEZ OBLIGATOIREMENT joindre `offices`, `employees`, `customers` et `orders` en utilisant les clés de jointure suivantes : `o.officeCode = e.officeCode`, `e.employeeNumber = c.salesRepEmployeeNumber`, et `c.customerNumber = ord.customerNumber`. La colonne à compter est `ord.orderNumber`, et le regroupement se fait par `o.city` ou `o.officeCode`.
-26. **RÈGLE CRITIQUE (AJOUTÉE):** Pour compter des entités (employés, clients, etc.) dans une requête qui joint la table `orders` à la table `orderdetails`, vous DEVEZ **toujours** utiliser `COUNT(DISTINCT <colonne_ID>)`. Par exemple, pour compter les employés, utilisez `COUNT(DISTINCT e.employeeNumber)`.
-27. **RÈGLE CRITIQUE (AJOUTÉE):** Pour calculer le 'montant moyen des commandes' (`average order amount`), vous DEVEZ d'abord calculer la somme totale pour chaque commande. Pour ce faire, utilisez une sous-requête (ou CTE) qui calcule `SUM(od.quantityOrdered * od.priceEach)` groupé par `od.orderNumber` et `c.customerNumber`, puis effectuez une moyenne (`AVG()`) sur ces totaux dans la requête principale.
-28. **RÈGLE CRITIQUE (NOUVELLE):** **SI** la question demande 'qui sont les managers', **ALORS** vous DEVEZ OBLIGATOIREMENT utiliser la clause `WHERE reportsTo IS NULL` sur la table `employees` et ne faire AUCUNE jointure inutile.
-29. **RÈGLE CRITIQUE (AJOUTÉE):** Lorsque vous calculez des agrégats basés sur des résultats de sous-requêtes, **VOUS NE DEVEZ JAMAIS** utiliser une fonction d'agrégation dans une autre. Par exemple, `SUM(AVG(...))` est incorrect. Calculez d'abord la moyenne dans une sous-requête, puis utilisez ce résultat dans la requête principale.
-30. **RÈGLE CRITIQUE (AJOUTÉE):** **Pour compter le nombre de commandes ou obtenir des informations sur les commandes par ville, vous DEVEZ OBLIGATOIREMENT joindre la table `orders` (`o`) et la table `customers` (`c`) sur `c.customerNumber = o.customerNumber`, et grouper par `c.city`. La colonne `city` est dans la table `customers`.**
-31. **RÈGLE CRITIQUE (NOUVELLE):** **Pour identifier les clients dont le montant total des commandes dépasse leur limite de crédit, vous DEVEZ OBLIGATOIREMENT calculer la somme des commandes par client dans une clause `GROUP BY`, puis utiliser une clause `HAVING` pour comparer ce total à la colonne `c.creditLimit`. N'utilisez JAMAIS de fonction d'agrégation dans une clause `WHERE`.**
-32. **RÈGLE CRITIQUE (NOUVELLE):** Lorsque vous utilisez une clause `GROUP BY`, toutes les colonnes non agrégées figurant dans votre clause `SELECT` doivent également être incluses dans la clause `GROUP BY` pour se conformer au mode SQL `ONLY_FULL_GROUP_BY`. Pour la question des clients et de leur limite de crédit, cela signifie que `c.customerName`, `c.country`, et `c.creditLimit` DOIVENT TOUS être dans le `GROUP BY`.
-33. **RÈGLE CRITIQUE (NOUVELLE):** **Pour identifier les clients dont les commandes impayées dépassent leur limite de crédit, vous DEVEZ OBLIGATOIREMENT :**
+24. **SI** la question demande des informations sur les commandes (`orders`), les clients (`customers`), le chiffre d'affaires (`turnover`) OU les quantités (`quantityOrdered`) par bureau (`office`), **ALORS** vous DEVEZ OBLIGATOIREMENT utiliser cette chaîne de jointures : `offices` (`o`) -> `employees` (`e`) -> `customers` (`c`) -> `orders` (`ord`) -> `orderdetails` (`od`). La jointure se fait sur `o.officeCode = e.officeCode`, `e.employeeNumber = c.salesRepEmployeeNumber`, `c.customerNumber = ord.customerNumber`, et `ord.orderNumber = od.orderNumber`.
+25. **SI** la question demande le 'nombre total de commandes par bureau', vous DEVEZ OBLIGATOIREMENT joindre `offices`, `employees`, `customers` et `orders` en utilisant les clés de jointure suivantes : `o.officeCode = e.officeCode`, `e.employeeNumber = c.salesRepEmployeeNumber`, et `c.customerNumber = ord.customerNumber`. La colonne à compter est `ord.orderNumber`, et le regroupement se fait par `o.city` ou `o.officeCode`.
+26. **Pour compter des entités** (employés, clients, etc.) dans une requête qui joint la table `orders` à la table `orderdetails`, vous DEVEZ **toujours** utiliser `COUNT(DISTINCT <colonne_ID>)`. Par exemple, pour compter les employés, utilisez `COUNT(DISTINCT e.employeeNumber)`.
+27. **Pour calculer le 'montant moyen des commandes'** (`average order amount`), vous DEVEZ d'abord calculer la somme totale pour chaque commande. Pour ce faire, utilisez une sous-requête (ou CTE) qui calcule `SUM(od.quantityOrdered * od.priceEach)` groupé par `od.orderNumber` et `c.customerNumber`, puis effectuez une moyenne (`AVG()`) sur ces totaux dans la requête principale.
+28. **SI** la question demande 'qui sont les managers', **ALORS** vous DEVEZ OBLIGATOIREMENT utiliser la clause `WHERE reportsTo IS NULL` sur la table `employees` et ne faire AUCUNE jointure inutile.
+29. **Lorsque vous calculez des agrégats** basés sur des résultats de sous-requêtes, **VOUS NE DEVEZ JAMAIS** utiliser une fonction d'agrégation dans une autre. Par exemple, `SUM(AVG(...))` est incorrect. Calculez d'abord la moyenne dans une sous-requête, puis utilisez ce résultat dans la requête principale.
+30. **Pour compter le nombre de commandes ou obtenir des informations sur les commandes par ville**, vous DEVEZ OBLIGATOIREMENT joindre la table `orders` (`o`) et la table `customers` (`c`) sur `c.customerNumber = o.customerNumber`, et grouper par `c.city`. La colonne `city` est dans la table `customers`.
+31. **Pour identifier les clients dont le montant total des commandes dépasse leur limite de crédit**, vous DEVEZ OBLIGATOIREMENT calculer la somme des commandes par client dans une clause `GROUP BY`, puis utiliser une clause `HAVING` pour comparer ce total à la colonne `c.creditLimit`. N'utilisez JAMAIS de fonction d'agrégation dans une clause `WHERE`.
+32. **Lorsque vous utilisez une clause `GROUP BY`**, toutes les colonnes non agrégées figurant dans votre clause `SELECT` doivent également être incluses dans la clause `GROUP BY` pour se conformer au mode SQL `ONLY_FULL_GROUP_BY`. Pour la question des clients et de leur limite de crédit, cela signifie que `c.customerName`, `c.country`, et `c.creditLimit` DOIVENT TOUS être dans le `GROUP BY`.
+33. **Pour identifier les clients dont les commandes impayées dépassent leur limite de crédit**, vous DEVEZ OBLIGATOIREMENT :
     - Joindre les tables `customers` (`c`), `orders` (`o`), `orderdetails` (`od`) et `payments` (`p`). Utilisez `LEFT JOIN` pour `payments` car certains clients peuvent ne pas avoir de paiements.
     - Regrouper les résultats par `c.customerNumber` (et les autres colonnes non agrégées dans le `SELECT` comme `c.customerName`, `c.country`, `c.creditLimit`).
     - Calculer le solde dû (`SUM(od.quantityOrdered * od.priceEach) - IFNULL(SUM(p.amount), 0)`) et l'utiliser dans la clause `HAVING` pour le comparer à `c.creditLimit`. Utilisez `IFNULL` pour gérer les clients sans paiement.
-34. **RÈGLE CRITIQUE (CORRIGÉE) :** **SI** la question demande la 'marge moyenne par ligne de produit', **ALORS** vous DEVEZ OBLIGATOIREMENT utiliser la table `marge_produit`. La requête doit simplement sélectionner `productLine` et la moyenne (`AVG`) de la colonne `revenu_brut` (qui représente la marge de chaque produit). Vous devez ensuite regrouper les résultats par `productLine`.
+34. **SI** la question demande la 'marge moyenne par ligne de produit', **ALORS** vous DEVEZ OBLIGATOIREMENT utiliser la table `marge_produit`. La requête doit simplement sélectionner `productLine` et la moyenne (`AVG`) de la colonne `revenu_brut` (qui représente la marge de chaque produit). Vous devez ensuite regrouper les résultats par `productLine`.
 35. **SI** la question demande les 'quantités commandées par bureau', 'total des commandes par bureau' ou d'autres métriques liées à la quantité et au bureau, vous DEVEZ OBLIGATOIREMENT utiliser la chaîne de jointures complète `offices` -> `employees` -> `customers` -> `orders` -> `orderdetails` et utiliser `SUM(od.quantityOrdered)`.
+36. **TOUJOURS** formater la requête SQL pour améliorer la lisibilité. Placez chaque clause (`SELECT`, `FROM`, `JOIN`, `WHERE`, `GROUP BY`, `ORDER BY`, `LIMIT`) sur une nouvelle ligne. Indentez les clauses de jointure et les colonnes sélectionnées pour un affichage clair. Par exemple:
+    ```sql
+    SELECT
+        t1.column1,
+        t2.column2
+    FROM
+        table1 AS t1
+    JOIN
+        table2 AS t2 ON t1.id = t2.id
+    WHERE
+        t1.column3 > 100
+    GROUP BY
+        t1.column1
+    ORDER BY
+        t2.column2 DESC
+    LIMIT 10;
+    ```
 """
 
 # --- Configuration de la base de données ---
-import os
-import mysql.connector
-from mysql.connector import Error
-from dotenv import load_dotenv
-import streamlit as st
-
-load_dotenv()
-
-@st.cache_resource
 def get_db_connection():
-    if "STREAMLIT_SERVER_PORT" in os.environ:
-        secrets = st.secrets
-    else:
-        secrets = os.environ
+    """Crée et renvoie un objet de connexion à la base de données."""
+    db_name = os.getenv("DB_DATABASE")
+    if not db_name:
+        print("Erreur: La variable d'environnement DB_DATABASE n'est pas définie.")
+        return None
 
     try:
         connection = mysql.connector.connect(
-            host=secrets["DB_HOST"],
-            user=secrets["DB_USER"],
-            password=secrets["DB_PASSWORD"],
-            port=int(secrets["DB_PORT"]),
-            database=secrets["DB_DATABASE"]
+            host=os.getenv("DB_HOST"),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASSWORD"),
+            database=db_name
         )
         if connection.is_connected():
             return connection
     except Error as e:
-        st.error(f"Erreur lors de la connexion à MySQL: {e}")
+        print(f"Erreur lors de la connexion à MySQL: {e}")
         return None
-    
 
 # --- Configuration de l'agent LLM (Groq) ---
 def setup_groq_client():
@@ -245,11 +253,17 @@ def generate_sql_query(user_question, db_schema, groq_client):
             messages=[
                 {"role": "system", "content": system_prompt},
             ],
-            model="llama3-8b-8192",
+            model="llama-3.1-8b-instant",
             temperature=0,
             max_tokens=500
         )
-        return chat_completion.choices[0].message.content.strip()
+        # Récupération de la réponse brute
+        raw_query = chat_completion.choices[0].message.content.strip()
+
+        # Nettoyage de la requête pour supprimer le formatage indésirable
+        cleaned_query = re.sub(r'```sql|```', '', raw_query).strip()
+        return cleaned_query
+
     except Exception as e:
         print(f"Erreur lors de la génération de la requête SQL: {e}")
         return None
@@ -312,7 +326,7 @@ def generate_example_questions(db_schema, groq_client):
             messages=[
                 {"role": "system", "content": system_prompt},
             ],
-            model="llama3-8b-8192",
+            model="llama-3.1-8b-instant",
             temperature=0.8,
             max_tokens=500
         )
@@ -351,8 +365,8 @@ def translate_questions(questions_list, target_language, groq_client):
             messages=[
                 {"role": "system", "content": system_prompt},
             ],
-            model="llama3-8b-8192",
-            temperature=0.2, # Une température basse pour une traduction fidèle
+            model="llama-3.1-8b-instant",
+            temperature=0.2,
             max_tokens=500
         )
         
@@ -389,50 +403,29 @@ def main():
         print("Impossible de récupérer le schéma de la base de données. Abandon.")
         connection.close()
         return
-
-    # 3. Génération dynamique des questions d'exemple
-    french_questions = generate_example_questions(db_schema, groq_client)
-    english_questions = translate_questions("\n".join(french_questions), "en", groq_client)
     
-    french_questions_str = "\n".join([f"- {q}" for q in french_questions])
-    english_questions_str = "\n".join([f"- {q}" for q in english_questions])
-
-    # 4. Affichage du message de bienvenue et des exemples
-    welcome_message = f"""
-Salut ! Je suis THE SQLer, un agent IA expert en SQL et DataViz. Je suis là pour vous aider à requêter la base de données ClassicModels en langage naturel.
-
-Exemples de questions:
-{french_questions_str}
-
-Example questions:
-{english_questions_str}
-    
-Comment puis-je vous aider aujourd'hui ?
-"""
-    print(welcome_message)
-    
-    # 5. Boucle principale de l'agent
+    # 3. Boucle principale de l'agent
     while True:
         user_question = input("\nVotre question (ou 'quitter' pour arrêter) : ")
         if user_question.lower() == 'quitter':
             break
 
-        # 6. Génération de la requête SQL
+        # 4. Génération de la requête SQL
         sql_query = generate_sql_query(user_question, db_schema, groq_client)
         
         if sql_query:
             print(f"\nRequête SQL générée :\n```sql\n{sql_query}\n```")
             
-            # 7. Exécution de la requête
+            # 5. Exécution de la requête
             query_results = execute_sql_query(connection, sql_query)
             
-            # 8. Affichage des résultats en Markdown
+            # 6. Affichage des résultats en Markdown
             if query_results:
                 markdown_output = format_results_markdown(query_results)
                 print("\nRésultats de la base de données :\n")
                 print(markdown_output)
 
-                # 9. Appel du module de visualisation
+                # 7. Appel du module de visualisation
                 chart_path = generate_visualization(user_question, query_results, groq_client)
                 if chart_path:
                     print(f"\nUn graphique a été créé pour ces résultats. Fichier : {chart_path}")
@@ -441,7 +434,7 @@ Comment puis-je vous aider aujourd'hui ?
             else:
                 print("\n**La requête n'a renvoyé aucun résultat ou une erreur est survenue.**")
 
-    # 10. Fermeture de la connexion
+    # 8. Fermeture de la connexion
     if connection.is_connected():
         connection.close()
 

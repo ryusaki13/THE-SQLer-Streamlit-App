@@ -70,9 +70,9 @@ def generate_visualization(user_question, query_results, groq_client):
             messages=[
                 {"role": "user", "content": visualization_prompt}
             ],
-            model="llama3-8b-8192",
+            model="llama-3.1-8b-instant",
             temperature=0,
-            max_tokens=200
+            max_tokens=500
         )
         json_output = chat_completion.choices[0].message.content.strip()
 

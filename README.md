@@ -51,7 +51,8 @@ L’application THE SQLer propose plusieurs fonctionnalités clés pour facilite
 - L’application a été développée entièrement dans un environnement virtuel Python (Isolation, gestion des dépendances, réproductibilité)
 - **Groq Cloud** : Plateforme avec modèles LLM **OpenSource** - <a href ="https://console.groq.com/home">Console_GROQ</a> 
 - **llama-3.1-8b-instant** : utilisé pour générer les requêtes SQL et les visualisations.
-  
+- **Railway** : déploiement en production de la base de données pour une utilisation accessible hors local - <a href ="https://railway.com/dashboard">Console_Railway</a>
+ 
 ### Frontend & UI  
 - **Streamlit**
 

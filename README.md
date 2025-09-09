@@ -1,17 +1,20 @@
 # THE SQLer : Agent IA pour des requêtes SQL et visualisations  
 
-## 📝 Résumé du projet  
+## Résumé du projet  
 **THE SQLer** est une application web interactive construite avec **Streamlit** qui permet aux utilisateurs de dialoguer avec une base de données **MySQL** en langage naturel.  
-Au lieu d'écrire des requêtes SQL complexes, l'utilisateur pose une question en français ou en anglais, et un l'agent IA génère,
-exécute et affiche les résultats sous forme de tableau et de visualisation de données.  
+Au lieu d'écrire des requêtes SQL complexes, l'utilisateur pose une question en français ou en anglais, et l'agent IA génère,
+exécute et affiche les résultats sous forme de tableau et de visualisation de données.
 
-  Ce projet a pour ambition de démocratiser l'accès aux données, en rendant l'analyse plus simple et intuitive pour les non-experts.
+Ce projet s’inscrit dans la continuité de notre précédent travail, où nous avions analysé la base de données MySQL Classicmodels en écrivant des requêtes SQL manuelles, en calculant des KPIs pertinents, puis en construisant un dashboard interactif avec Power BI pour la visualisation.
+Avec **THE SQLer**, nous franchissons une nouvelle étape : l’application intègre désormais la génération automatique de requêtes et de visualisations en langage naturel, réunissant en une seule interface tout le processus d’analyse, de la question utilisateur à l’affichage des résultats. - <a href ="https://github.com/ryusaki13/Classic-Models-Analysis-SQL-DataViz-/tree/main">Précédent_projet</a>
+
+Ce projet a pour ambition de démocratiser l'accès aux données, en rendant l'analyse plus simple et intuitive pour les non-experts.
 Il met également en lumière le rôle de l’IA comme levier de productivité, permettant aux professionnels de la donnée de décupler leur efficacité, 
 d’optimiser leurs analyses et de gagner un temps précieux dans leurs missions quotidiennes.
 
 ---
 
-## 🎯 Objectif du projet  
+## Objectif du projet  
 L'objectif principal est de créer un outil de **Business Intelligence (BI) conversationnel**, en s'appuyant sur les capacités de la génération de langage par IA.  
 
 Le projet vise à :  
@@ -38,10 +41,10 @@ L’application THE SQLer propose plusieurs fonctionnalités clés pour facilite
 
 ---
 
-## 🛠️ Outils et technologies  
+## Outils et techniques  
 
 ### Base de données  
-- **MySQL** : Célèbre base de données Mysql Classicmodels  - <a href ="https://github.com/ryusaki13/Classic-Models-Analysis-SQL-DataViz-/blob/main/Classic%20models%20tables.sql">Console_GROQ</a>
+- **MySQL** : Célèbre base de données Classicmodels  - <a href ="https://github.com/ryusaki13/Classic-Models-Analysis-SQL-DataViz-/blob/main/Classic%20models%20tables.sql">Base_Classicmodels</a>
 - **mysql-connector-python**
 
 ### Backend & IA 
@@ -54,15 +57,18 @@ L’application THE SQLer propose plusieurs fonctionnalités clés pour facilite
 
 ---
 
-## 🚧 Défis, limites et solutions  
+## Potentielles améliorations 
 
-### 🔹 Lenteur au démarrage  
-- **Problème** : le temps de chargement initial était élevé, car la connexion à la base et la récupération du schéma se faisaient à chaque rechargement.  
-- ✅ **Solution** : utilisation du cache Streamlit (`@st.cache_resource` et `@st.cache_data`).  
+- Visualisations interactives : utiliser **Plotly** ou **Altair** pour ajouter zoom, filtres et infobulles.
 
-### 🔹 Risques de sécurité (SQL Injection)  
-- **Problème** : exécuter des requêtes générées par l'IA est risqué.  
-- ✅ **Solution** : règles strictes dans le prompt de l'IA pour limiter les requêtes et empêcher les actions non désirées.  
+- Refonte de l’UI : rendre l’interface Streamlit plus ergonomique et moderne.
 
-### 🔹 Complexité de certaines requêtes  
-- **Problème** : certains calculs métiers (taux de rotatio
+- Multi-bases de données : étendre la compatibilité à **PostgreSQL**, **SQL Server**, etc.
+
+- Gestion des erreurs : fournir des messages clairs et des solutions de repli en cas d’échec.
+
+- Personnalisation utilisateur : sauvegarde des requêtes fréquentes et génération de rapports automatisés.
+
+- Mémoire longue : mettre en place un historique de discussions pour que l’IA se souvienne des questions précédentes et facilite les analyses itératives.
+
+- Sécurité renforcée : ajout d’un contrôle des accès et gestion des permissions utilisateurs.

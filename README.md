@@ -75,4 +75,7 @@ L’application THE SQLer propose plusieurs fonctionnalités clés pour facilite
 - Sécurité renforcée : ajout d’un contrôle des accès et gestion des permissions utilisateurs.
 
 ## Démo THE SQLer
-https://github.com/user-attachments/assets/b5f82378-ca4e-40fc-9212-67496d6091c9
+
+   https://github.com/user-attachments/assets/ddb67708-19ba-4190-9888-dd60bde7b280
+
+

@@ -39,9 +39,6 @@ L’application THE SQLer propose plusieurs fonctionnalités clés pour facilite
 - Export des résultats : toutes les sorties (tableaux, résultats de requêtes, visualisations) peuvent être téléchargées au format CSV ou copiées pour un usage ultérieur.
 - Interface intuitive : toutes les données et graphiques sont accessibles directement depuis l’application Streamlit.
 
-https://github.com/user-attachments/assets/b5f82378-ca4e-40fc-9212-67496d6091c9
-
-
 ---
 
 ## Outils et techniques  
@@ -76,3 +73,6 @@ https://github.com/user-attachments/assets/b5f82378-ca4e-40fc-9212-67496d6091c9
 - Mémoire longue : mettre en place un historique de discussions pour que l’IA se souvienne des questions précédentes et facilite les analyses itératives.
 
 - Sécurité renforcée : ajout d’un contrôle des accès et gestion des permissions utilisateurs.
+
+## Démo THE SQLer
+https://github.com/user-attachments/assets/b5f82378-ca4e-40fc-9212-67496d6091c9
